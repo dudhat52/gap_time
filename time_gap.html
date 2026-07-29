@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gap Highlighter</title>
+    <style>
+        :root {
+            --bg: #f6f7fb;
+            --card: #ffffff;
+            --text: #111827;
+            --muted: #6b7280;
+            --border: #d1d5db;
+            --red: #fee2e2;
+            --orange: #ffedd5;
+            --header: #eef2ff;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .wrap {
+            max-width: 1300px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: 28px;
+        }
+
+        p {
+            color: var(--muted);
+            margin-top: 0;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 16px;
+            margin-top: 16px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 260px;
+            gap: 16px;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 320px;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-family: Consolas, Monaco, monospace;
+            font-size: 12px;
+            resize: vertical;
+            white-space: pre;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn,
+        .filelabel {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border: 1px solid var(--border);
+            background: #fff;
+            color: var(--text);
+            border-radius: 10px;
+            padding: 10px 14px;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: none;
+        }
+
+        .btn:hover,
+        .filelabel:hover {
+            background: #f9fafb;
+        }
+
+        .small {
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .counts {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .pill {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            font-size: 13px;
+            margin-right: 6px;
+            margin-top: 6px;
+        }
+
+        .pill.red {
+            background: var(--red);
+        }
+
+        .pill.orange {
+            background: var(--orange);
+        }
+
+        .tablewrap {
+            overflow: auto;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: white;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 12px;
+        }
+
+        thead th {
+            position: sticky;
+            top: 0;
+            background: var(--header);
+            z-index: 1;
+        }
+
+        th,
+        td {
+            border-bottom: 1px solid #e5e7eb;
+            padding: 8px 10px;
+            text-align: left;
+            white-space: nowrap;
+            vertical-align: top;
+        }
+
+        tr.red {
+            background: var(--red);
+        }
+
+        tr.orange {
+            background: var(--orange);
+        }
+
+        .footer-note {
+            margin-top: 10px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        @media (max-width: 900px) {
+            .row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <h1>Gap Highlighter</h1>
+
+        <div class="card">
+            <div class="row">
+                <div>
+                    <textarea id="dataInput" placeholder="Paste your data here"></textarea>
+                    <div style="margin-top:10px;">
+                        <span class="pill red">Red: &gt; 10 min</span>
+                        <span class="pill orange">Orange: 5 to 10 min</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 style="margin-top:0;">Highlighted Output</h2>
+            <div class="tablewrap">
+                <table id="outputTable">
+                    <thead>
+                        <tr id="theadRow"></tr>
+                    </thead>
+                    <tbody id="tbody"></tbody>
+                </table>
+            </div>
+            <div class="footer-note" id="status"></div>
+        </div>
+    </div>
+
+    <script>
+        const INPUT_HEADERS = [
+            "Date (EDT)",
+            "OP",
+            "RS",
+            "ASIN",
+            "FNSku",
+            "FCSku",
+            "LPN",
+            "Quantity(+1)",
+            "Person",
+            "Old Bin",
+            "New Bin",
+            "Old Owner",
+            "New Owner",
+            "Tool"
+        ];
+
+        const OUTPUT_COLUMNS = [
+            { label: "Date (EDT)", index: 0 },
+            { label: "ASIN", index: 3 },
+            { label: "FNSku", index: 4 },
+            { label: "FCSku", index: 5 },
+            { label: "Person", index: 8 },
+            { label: "Old Bin", index: 9 },
+            { label: "New Bin", index: 10 },
+            { label: "Gap Minutes", index: null }
+        ];
+
+        const dataInput = document.getElementById('dataInput');
+        const fileInput = document.getElementById('fileInput');
+        const clearBtn = document.getElementById('clearBtn');
+        const tbody = document.getElementById('tbody');
+        const theadRow = document.getElementById('theadRow');
+        const redCount = document.getElementById('redCount');
+        const orangeCount = document.getElementById('orangeCount');
+        const statusEl = document.getElementById('status');
+
+        function splitLine(line) {
+            if (line.includes('\t')) return line.split('\t');
+            return line.trim().split(/\s{2,}/);
+        }
+
+        function normalizeCell(value) {
+            return String(value || '').trim().toLowerCase();
+        }
+
+        function parseDate(value) {
+            const v = (value || '').trim();
+            if (!v) return null;
+            const normalized = v.length === 16 ? v + ':00' : v;
+            const d = new Date(normalized.replace(' ', 'T'));
+            return Number.isNaN(d.getTime()) ? null : d;
+        }
+
+        function isHeaderLine(line) {
+            return INPUT_HEADERS.some(h => normalizeCell(line) === normalizeCell(h));
+        }
+
+        function stripLeadingHeaderLines(lines) {
+            let start = 0;
+            while (start < lines.length && isHeaderLine(lines[start])) {
+                start++;
+            }
+            return lines.slice(start);
+        }
+
+        function renderHeader() {
+            theadRow.innerHTML = '';
+            OUTPUT_COLUMNS.forEach(col => {
+                const th = document.createElement('th');
+                th.textContent = col.label;
+                theadRow.appendChild(th);
+            });
+        }
+
+        function render() {
+            const text = dataInput.value || '';
+            let lines = text
+                .split(/\r?\n/)
+                .map(l => l.trimEnd())
+                .filter(l => l.trim().length > 0);
+
+            tbody.innerHTML = '';
+            renderHeader();
+
+            if (lines.length === 0) {
+                redCount.textContent = '0';
+                orangeCount.textContent = '0';
+                statusEl.textContent = '';
+                return;
+            }
+
+            lines = stripLeadingHeaderLines(lines);
+
+            if (lines.length === 0) {
+                redCount.textContent = '0';
+                orangeCount.textContent = '0';
+                statusEl.textContent = 'Header detected, but no data rows found.';
+                return;
+            }
+
+            let red = 0;
+            let orange = 0;
+
+            lines.forEach((line, idx) => {
+                const cells = splitLine(line);
+
+                const current = parseDate(cells[0] || '');
+                const nextLine = lines[idx + 1];
+                const nextCells = nextLine ? splitLine(nextLine) : null;
+                const nextDate = parseDate(nextCells ? (nextCells[0] || '') : '');
+
+                let gapMin = null;
+                if (current && nextDate) {
+                    gapMin = (current.getTime() - nextDate.getTime()) / 60000;
+                }
+
+                const tr = document.createElement('tr');
+                if (gapMin !== null && gapMin > 10) {
+                    tr.className = 'red';
+                    red++;
+                } else if (gapMin !== null && gapMin > 5) {
+                    tr.className = 'orange';
+                    orange++;
+                }
+
+                OUTPUT_COLUMNS.forEach(col => {
+                    const td = document.createElement('td');
+                    if (col.label === 'Gap Minutes') {
+                        td.textContent = gapMin === null ? '' : gapMin.toFixed(1);
+                    } else {
+                        td.textContent = cells[col.index] || '';
+                    }
+                    tr.appendChild(td);
+                });
+
+                tbody.appendChild(tr);
+            });
+
+            redCount.textContent = String(red);
+            orangeCount.textContent = String(orange);
+            statusEl.textContent = 'Only the selected columns are shown in the output.';
+        }
+
+        dataInput.addEventListener('input', render);
+
+        fileInput.addEventListener('change', () => {
+            const file = fileInput.files && fileInput.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+                dataInput.value = String(reader.result || '');
+                render();
+            };
+            reader.readAsText(file);
+        });
+
+        clearBtn.addEventListener('click', () => {
+            dataInput.value = '';
+            fileInput.value = '';
+            render();
+        });
+
+        // Sample input
+        dataInput.value = `2026-07-28 20:07\tM\t\tB0FLWRKJK4\tX004SNQ9GP\tZZQA9KGOGJ\t\t1\tvictanyi\tP-1-Q410B130\ttscage103\t4.64549E+14\t4.64549E+14\tFCPickCompleteServi
+2026-07-28 20:04\tM\t\tB07DL4CZZ5\tB07DL4CZZ5\tZZSGZTMR5D\t\t1\tvictanyi\tP-1-Q410B370\ttscage103\t4.64564E+14\t4.64564E+14\tFCPickCompleteServi`;
+        render();
+    </script>
+</body>
+
+</html>
